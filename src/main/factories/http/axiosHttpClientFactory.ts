@@ -1,5 +1,6 @@
-import { AxiosHttpClient } from "../../../infra";
+import { AxiosHttpClient } from '../../../infra/axiosHttpClient/axiosHttpClient'
+import { AuthenticationModel } from '../../../data/services/authentication'
 
-export const MakeAxiosHttpClient = <BodyType, ResponseType>(): AxiosHttpClient<BodyType, ResponseType> => {
-  return new AxiosHttpClient();
+export const MakeAxiosHttpClient = (): AxiosHttpClient<any, AuthenticationModel> => {
+  return new AxiosHttpClient()
 }
