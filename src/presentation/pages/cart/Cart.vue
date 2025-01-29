@@ -11,7 +11,19 @@
       <!-- Cart Items -->
       <div class="cart-items">
         <div v-for="item in cartItems" :key="item.id" class="cart-item">
-          <img :src="item.image" :alt="item.name" class="item-image" />
+          <div class="item-image-container">
+            <img 
+              v-if="item.image" 
+              :src="item.image" 
+              :alt="item.name" 
+              class="item-image" 
+              @error="item.image = null"
+            />
+            <div v-else class="image-placeholder">
+              <i class="pi pi-image"></i>
+              <span>Imagem não disponível</span>
+            </div>
+          </div>
           <div class="item-details">
             <h3>{{ item.name }}</h3>
             <div class="quantity-control">
@@ -30,6 +42,15 @@
                 <i class="pi pi-plus"></i>
               </Button>
             </div>
+            <Button 
+              icon="pi pi-trash" 
+              severity="danger" 
+              text 
+              rounded 
+              @click="removeItem(item)"
+              class="remove-button"
+              aria-label="Remover item"
+            />
           </div>
           <div class="item-actions">
             <span class="item-price">{{ formatPrice(item.price * item.quantity) }}</span>
@@ -40,18 +61,6 @@
       <!-- Cart Summary -->
       <div class="cart-summary">
         <div class="summary-content">
-          <div class="summary-row">
-            <span>Subtotal</span>
-            <span>{{ formatPrice(subtotal) }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Delivery Fee</span>
-            <span>{{ formatPrice(deliveryFee) }}</span>
-          </div>
-          <div class="summary-row">
-            <span>Tax</span>
-            <span>{{ formatPrice(tax) }}</span>
-          </div>
           <div class="summary-row total">
             <span>Total</span>
             <span>{{ formatPrice(total) }}</span>
@@ -73,7 +82,7 @@
       <h3>Seu carrinho está vazio</h3>
       <p>Adicione alguns itens ao seu carrinho para vê-los aqui</p>
       <router-link to="/hamburgers">
-        <Button>
+        <Button @click="continueShopping">
           Ver Cardápio
         </Button>
       </router-link>
@@ -82,51 +91,25 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 
 interface CartItem {
-  id: number
+  id: number | string
   name: string
-  image: string
+  image: string | null
   price: number
   quantity: number
 }
 
 const router = useRouter()
-const cartItems = ref<CartItem[]>([
-  {
-    id: 1,
-    name: 'Cheeseburger',
-    image: 'https://files.menudino.com/cardapios/37486/212.jpg',
-    price: 25.90,
-    quantity: 1
-  },
-  {
-    id: 2,
-    name: 'French Fries',
-    image: 'https://www.allrecipes.com/thmb/k8Zmp_7R0fsY7kVpjvWVw_BgSCA=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/219634-chef-johns-french-fries-DDMFS-4x3-338dec7976fc4d75bb3e2c18ff6a5958.jpg',
-    price: 12.90,
-    quantity: 1
-  },
-  {
-    id: 3,
-    name: 'Coke',
-    image: 'https://www.coca-cola.com/content/dam/onexp/br/pt/brands/coca-cola/brazil_coca-cola_original_355ml_can.png',
-    price: 7.90,
-    quantity: 1
-  }
-])
+const toast = useToast()
+const cartItems = ref<CartItem[]>([])
 
-const deliveryFee = 8.00
-const taxRate = 0.05
-
-const subtotal = computed(() => {
+const total = computed(() => {
   return cartItems.value.reduce((acc, item) => acc + (item.price * item.quantity), 0)
 })
-
-const tax = computed(() => subtotal.value * taxRate)
-const total = computed(() => subtotal.value + deliveryFee + tax.value)
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -135,36 +118,84 @@ const formatPrice = (price: number) => {
   }).format(price)
 }
 
-const updateQuantity = (item: CartItem, quantity: number) => {
-  const index = cartItems.value.findIndex(i => i.id === item.id)
-  if (index !== -1) {
-    if (quantity <= 0) {
-      cartItems.value.splice(index, 1)
-    } else {
-      cartItems.value[index].quantity = quantity
-    }
-    // Atualiza o localStorage
-    localStorage.setItem('burgerlivery:cart', JSON.stringify(cartItems.value))
+const loadCartItems = () => {
+  const currentCart = localStorage.getItem('burgerlivery:cart')
+  if (currentCart) {
+    cartItems.value = JSON.parse(currentCart)
+  }
+}
+
+const removeItem = (item: CartItem) => {
+  cartItems.value = cartItems.value.filter(i => !(i.id === item.id && i.name === item.name))
+  localStorage.setItem('burgerlivery:cart', JSON.stringify(cartItems.value))
+  
+  toast.add({
+    severity: 'info',
+    summary: 'Item removido',
+    detail: `${item.name} foi removido do carrinho`,
+    life: 3000
+  })
+}
+
+const updateQuantity = (item: CartItem, newQuantity: number) => {
+  if (newQuantity < 1) {
+    removeItem(item)
+    return
+  }
+
+  const oldQuantity = item.quantity
+  item.quantity = newQuantity
+  localStorage.setItem('burgerlivery:cart', JSON.stringify(cartItems.value))
+
+  if (newQuantity > oldQuantity) {
+    toast.add({
+      severity: 'success',
+      summary: 'Quantidade aumentada',
+      detail: `Quantidade de ${item.name} aumentada para ${newQuantity}`,
+      life: 3000
+    })
+  } else {
+    toast.add({
+      severity: 'info',
+      summary: 'Quantidade reduzida',
+      detail: `Quantidade de ${item.name} reduzida para ${newQuantity}`,
+      life: 3000
+    })
   }
 }
 
 const goToCheckout = () => {
-  // Verifica se o usuário está logado
-  const token = localStorage.getItem('burgerlivery:token')
-  if (!token) {
-    router.push('/login')
+  if (cartItems.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Carrinho vazio',
+      detail: 'Adicione itens ao carrinho antes de prosseguir',
+      life: 3000
+    })
     return
   }
-  
+
   router.push('/checkout')
 }
 
-// Carrega itens do carrinho ao montar o componente
+const continueShopping = () => {
+  router.push('/hamburgers')
+}
+
+// Carregar itens quando o componente é montado
 onMounted(() => {
-  const cartData = localStorage.getItem('burgerlivery:cart')
-  if (cartData) {
-    cartItems.value = JSON.parse(cartData)
+  loadCartItems()
+})
+
+// Recarregar itens quando o localStorage é atualizado em outras abas/janelas
+window.addEventListener('storage', (e) => {
+  if (e.key === 'burgerlivery:cart') {
+    loadCartItems()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', loadCartItems)
 })
 </script>
 
@@ -206,18 +237,43 @@ h2 {
 .cart-item {
   display: flex;
   align-items: center;
-  gap: 1rem;
   padding: 1rem;
-  background: var(--surface-0);
+  margin-bottom: 1rem;
+  background: white;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.item-image-container {
+  width: 100px;
+  height: 100px;
+  margin-right: 1rem;
+  overflow: hidden;
+  border-radius: 8px;
 }
 
 .item-image {
-  width: 80px;
-  height: 80px;
+  width: 100%;
+  height: 100%;
   object-fit: cover;
-  border-radius: 8px;
+}
+
+.image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  color: #6c757d;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.image-placeholder i {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
 }
 
 .item-details {
@@ -264,6 +320,15 @@ h2 {
   font-size: 1.125rem;
 }
 
+.remove-button {
+  color: var(--red-500);
+}
+
+.remove-button:hover {
+  color: var(--red-600);
+  background: var(--red-50);
+}
+
 .cart-summary {
   background: var(--surface-0);
   padding: 1.5rem;
@@ -278,14 +343,6 @@ h2 {
 
 .summary-content {
   margin-bottom: 2rem;
-}
-
-.summary-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  color: var(--text-color-secondary);
-  margin-bottom: 1rem;
 }
 
 .summary-row.total {
@@ -357,7 +414,7 @@ h2 {
     align-items: flex-start;
   }
 
-  .item-image {
+  .item-image-container {
     width: 100%;
     height: 200px;
   }

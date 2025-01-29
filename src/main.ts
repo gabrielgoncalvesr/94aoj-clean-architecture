@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import App from './App.vue'
 import PrimeVue from 'primevue/config'
 import router from './presentation/router'
+import ToastService from 'primevue/toastservice'
 
 // PrimeVue Components
 import Button from 'primevue/button'
@@ -22,6 +23,7 @@ const app = createApp(App)
 // Use plugins
 app.use(PrimeVue, { ripple: true })
 app.use(router)
+app.use(ToastService)
 
 // Register components
 app.component('Button', Button)

@@ -11,48 +11,56 @@
       <!-- Cart Items -->
       <div class="cart-items">
         <div v-for="item in cartItems" :key="item.id" class="cart-item">
-          <img :src="item.image" :alt="item.name" class="item-image" />
+          <div class="item-image">
+            <img v-if="item.image" :src="item.image" :alt="item.name" />
+            <div v-else class="image-placeholder">
+              <i class="pi pi-image"></i>
+            </div>
+          </div>
           <div class="item-details">
             <h3>{{ item.name }}</h3>
-            <p class="item-quantity">{{ item.quantity }}x {{ item.name }}</p>
-          </div>
-          <div class="item-actions">
-            <span class="item-price">{{ formatPrice(item.price * item.quantity) }}</span>
-            <Button 
-              class="p-button-text p-button-danger" 
-              @click="removeItem(item)"
-            >
-              Remove
-            </Button>
+            <div class="item-price">{{ formatPrice(item.price) }}</div>
+            <div class="item-actions">
+              <InputNumber 
+                v-model="item.quantity" 
+                :min="1" 
+                showButtons 
+                @input="updateQuantity(item, $event)"
+                class="quantity-input"
+              />
+              <Button 
+                icon="pi pi-trash" 
+                severity="danger" 
+                text 
+                rounded 
+                @click="removeItem(item)"
+                class="remove-button"
+                aria-label="Remover item"
+              />
+            </div>
           </div>
         </div>
       </div>
 
       <!-- Cart Summary -->
       <div class="cart-summary">
-        <div class="summary-row">
-          <span>Subtotal</span>
-          <span>{{ formatPrice(subtotal) }}</span>
-        </div>
-        <div class="summary-row">
-          <span>Delivery Fee</span>
-          <span>{{ formatPrice(deliveryFee) }}</span>
-        </div>
-        <div class="summary-row">
-          <span>Tax</span>
-          <span>{{ formatPrice(tax) }}</span>
-        </div>
-        <div class="summary-row total">
+        <div class="total">
           <span>Total</span>
           <span>{{ formatPrice(total) }}</span>
         </div>
-
         <Button 
-          class="checkout-button"
+          class="checkout-button" 
           @click="checkout"
           :loading="loading"
+          :disabled="cartItems.length === 0"
         >
-          Checkout
+          Finalizar Pedido
+        </Button>
+        <Button 
+          class="continue-shopping-button"
+          @click="continueShopping"
+        >
+          Continue Shopping
         </Button>
       </div>
     </div>
@@ -60,13 +68,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { useToast } from 'primevue/usetoast'
 import Dialog from 'primevue/dialog'
+import InputNumber from 'primevue/inputnumber'
+import Button from 'primevue/button'
 
 interface CartItem {
-  id: number
+  id: number | string
   name: string
-  image: string
+  image: string | null
   price: number
   quantity: number
 }
@@ -75,46 +87,18 @@ const props = defineProps<{
   modelValue: boolean
 }>()
 
-const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void
-}>()
+const emit = defineEmits(['update:modelValue'])
 
+const router = useRouter()
+const toast = useToast()
 const loading = ref(false)
 
 // Mock data
-const cartItems = ref<CartItem[]>([
-  {
-    id: 1,
-    name: 'Cheeseburger',
-    image: 'https://files.menudino.com/cardapios/37486/212.jpg',
-    price: 25.90,
-    quantity: 1
-  },
-  {
-    id: 2,
-    name: 'French Fries',
-    image: 'https://www.allrecipes.com/thmb/k8Zmp_7R0fsY7kVpjvWVw_BgSCA=/1500x0/filters:no_upscale():max_bytes(150000):strip_icc()/219634-chef-johns-french-fries-DDMFS-4x3-338dec7976fc4d75bb3e2c18ff6a5958.jpg',
-    price: 12.90,
-    quantity: 1
-  },
-  {
-    id: 3,
-    name: 'Coke',
-    image: 'https://www.coca-cola.com/content/dam/onexp/br/pt/brands/coca-cola/brazil_coca-cola_original_355ml_can.png',
-    price: 7.90,
-    quantity: 1
-  }
-])
+const cartItems = ref<CartItem[]>([])
 
-const deliveryFee = 8.00
-const taxRate = 0.05
-
-const subtotal = computed(() => {
-  return cartItems.value.reduce((acc, item) => acc + (item.price * item.quantity), 0)
+const total = computed(() => {
+  return cartItems.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
 })
-
-const tax = computed(() => subtotal.value * taxRate)
-const total = computed(() => subtotal.value + deliveryFee + tax.value)
 
 const formatPrice = (price: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -123,24 +107,91 @@ const formatPrice = (price: number) => {
   }).format(price)
 }
 
-const removeItem = (item: CartItem) => {
-  const index = cartItems.value.findIndex(i => i.id === item.id)
-  if (index !== -1) {
-    cartItems.value.splice(index, 1)
+const loadCartItems = () => {
+  const currentCart = localStorage.getItem('burgerlivery:cart')
+  if (currentCart) {
+    cartItems.value = JSON.parse(currentCart)
   }
 }
 
+const updateQuantity = (item: CartItem, newQuantity: number) => {
+  if (newQuantity < 1) {
+    removeItem(item)
+    return
+  }
+
+  const oldQuantity = item.quantity
+  item.quantity = newQuantity
+  localStorage.setItem('burgerlivery:cart', JSON.stringify(cartItems.value))
+
+  if (newQuantity > oldQuantity) {
+    toast.add({
+      severity: 'success',
+      summary: 'Quantidade aumentada',
+      detail: `Quantidade de ${item.name} aumentada para ${newQuantity}`,
+      life: 3000
+    })
+  } else {
+    toast.add({
+      severity: 'info',
+      summary: 'Quantidade reduzida',
+      detail: `Quantidade de ${item.name} reduzida para ${newQuantity}`,
+      life: 3000
+    })
+  }
+}
+
+const removeItem = (item: CartItem) => {
+  cartItems.value = cartItems.value.filter(i => !(i.id === item.id && i.name === item.name))
+  localStorage.setItem('burgerlivery:cart', JSON.stringify(cartItems.value))
+  
+  toast.add({
+    severity: 'info',
+    summary: 'Item removido',
+    detail: `${item.name} foi removido do carrinho`,
+    life: 3000
+  })
+}
+
 const checkout = async () => {
+  if (cartItems.value.length === 0) {
+    toast.add({
+      severity: 'warn',
+      summary: 'Carrinho vazio',
+      detail: 'Adicione itens ao carrinho antes de prosseguir',
+      life: 3000
+    })
+    return
+  }
+
   loading.value = true
   try {
-    // Implementar lógica de checkout
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    cartItems.value = []
     emit('update:modelValue', false)
+    router.push('/cart')
   } finally {
     loading.value = false
   }
 }
+
+const continueShopping = () => {
+  emit('update:modelValue', false)
+}
+
+// Carregar itens quando o componente é montado
+onMounted(() => {
+  loadCartItems()
+})
+
+// Recarregar itens quando o localStorage é atualizado em outras abas/janelas
+window.addEventListener('storage', (e) => {
+  if (e.key === 'burgerlivery:cart') {
+    loadCartItems()
+  }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('storage', loadCartItems)
+})
 </script>
 
 <style scoped>
@@ -183,7 +234,7 @@ const checkout = async () => {
   color: var(--text-color);
 }
 
-.item-quantity {
+.item-price {
   margin: 0.25rem 0 0 0;
   font-size: 0.875rem;
   color: var(--text-color-secondary);
@@ -196,9 +247,13 @@ const checkout = async () => {
   gap: 0.5rem;
 }
 
-.item-price {
-  font-weight: 600;
-  color: var(--primary-700);
+.remove-button {
+  color: var(--red-500);
+}
+
+.remove-button:hover {
+  color: var(--red-600);
+  background: var(--red-50);
 }
 
 .cart-summary {
@@ -209,20 +264,17 @@ const checkout = async () => {
   border-top: 1px solid var(--surface-200);
 }
 
-.summary-row {
+.total {
   display: flex;
   justify-content: space-between;
   align-items: center;
   color: var(--text-color-secondary);
 }
 
-.summary-row.total {
+.total span:last-child {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--text-color);
-  margin-top: 0.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--surface-200);
 }
 
 .checkout-button {
@@ -239,6 +291,22 @@ const checkout = async () => {
 
 .checkout-button:enabled:hover {
   background: var(--primary-600) !important;
+}
+
+.continue-shopping-button {
+  margin-top: 1rem;
+  width: 100%;
+  background: var(--surface-50) !important;
+  border: none !important;
+  padding: 1rem !important;
+  font-size: 1rem !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.continue-shopping-button:enabled:hover {
+  background: var(--surface-100) !important;
 }
 
 @media screen and (max-width: 640px) {

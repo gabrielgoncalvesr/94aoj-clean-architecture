@@ -17,17 +17,37 @@
     </div>
 
     <div v-else class="products-grid">
-      <ProductCard
-        v-for="product in products"
-        :key="product.id"
-        :product="{
+      <template v-if="route.path === '/hamburgers'">
+        <ProductHamburgerCard v-for="product in products" :key="product.id" :product="{
+          id: product.id,
+          name: product.title,
+          description: product.description,
+          price_single: product.values.single,
+          price_combo: product.values.combo,
+          image: Array.isArray(product.image) ? product.image[0] : product.image
+        }" />
+      </template>
+
+      <template v-else-if="route.path === '/sides'">
+        <ProductAppertizersCard v-for="product in products" :key="product.id" :product="{
+          id: product.id,
+          name: product.title,
+          description: product.description,
+          price_large: product.values.large,
+          price_small: product.values.small,
+          image: Array.isArray(product.image) ? product.image[0] : product.image
+        }" />
+      </template>
+
+      <template v-else>
+        <ProductCard v-for="product in products" :key="product.id" :product="{
           id: product.id,
           name: product.title,
           description: product.description,
           price: getProductPrice(product),
           image: Array.isArray(product.image) ? product.image[0] : product.image
-        }"
-      />
+        }" />
+      </template>
     </div>
   </div>
 </template>
@@ -36,6 +56,8 @@
 import { ref, computed, onMounted, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import ProductCard from '../../components/ProductCard.vue'
+import ProductHamburgerCard from '../../components/ProductHamburgerCard.vue'
+import ProductAppertizersCard from '../../components/ProductAppertizersCard.vue'
 import { MakeProducts } from '../../../main/factories/services/productsFactory'
 import type { Product } from '../../../domain/models/product'
 
@@ -79,7 +101,7 @@ const getProductPrice = (product: Product): number => {
 
 const updateScrollClass = () => {
   if (!contentRef.value) return
-  
+
   const hasScroll = contentRef.value.scrollHeight > contentRef.value.clientHeight
   contentRef.value.classList.toggle('no-scroll', !hasScroll)
 }
@@ -87,7 +109,7 @@ const updateScrollClass = () => {
 const loadProducts = async () => {
   loading.value = true
   error.value = ''
-  
+
   try {
     switch (route.path) {
       case '/hamburgers':

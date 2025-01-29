@@ -1,31 +1,30 @@
 <template>
   <div class="product-card">
     <div class="product-image">
-      <img 
-        v-if="product.image && !hasImageError" 
-        :src="product.image" 
-        :alt="product.name"
-        @error="handleImageError"
-      />
+      <img v-if="product.image && !hasImageError" :src="product.image" :alt="product.name" @error="handleImageError" />
       <div v-else class="image-placeholder">
         <i class="fas fa-image"></i>
         <span>Imagem não disponível</span>
       </div>
     </div>
-    
+
     <div class="product-content">
       <h3 class="product-name">{{ product.name }}</h3>
       <p class="product-description">{{ product.description }}</p>
-      
+
       <div class="product-footer">
-        <span class="product-price">{{ formatPrice(product.price) }}</span>
-        <Button 
-          class="add-to-cart"
-          @click="addToCart"
-          :loading="loading"
-        >
+        <span class="product-price">{{ formatPrice(product.price_small) }}</span>
+        <Button class="add-to-cart" @click="addToCart('small')" :loading="loading">
           <i class="pi pi-shopping-cart"></i>
-          Adicionar
+          Pequeno
+        </Button>
+      </div>
+
+      <div class="product-footer">
+        <span class="product-price">{{ formatPrice(product.price_large) }}</span>
+        <Button class="add-to-cart" @click="addToCart('large')" :loading="loading">
+          <i class="pi pi-shopping-cart"></i>
+          Grande
         </Button>
       </div>
     </div>
@@ -41,7 +40,8 @@ interface ProductProps {
   id: string | number
   name: string
   description: string
-  price: number
+  price_large: number
+  price_small: number
   image: string | null
 }
 
@@ -65,46 +65,38 @@ const handleImageError = () => {
   hasImageError.value = true
 }
 
-const addToCart = async () => {
+const addToCart = async (size: 'large' | 'small') => {
   loading.value = true
   try {
-    const cartItems = JSON.parse(localStorage.getItem('burgerlivery:cart') || '[]')
-    
-    // Verifica se o item já existe no carrinho
-    const existingItem = cartItems.find((item: any) => 
-      item.id === props.product.id && item.name === props.product.name
-    )
-
-    console.log(existingItem)
-
-    if (existingItem) {
-      existingItem.quantity += 1
-      toast.add({
-        severity: 'success',
-        summary: 'Item atualizado',
-        detail: `Quantidade de ${props.product.name} aumentada no carrinho`,
-        life: 3000
-      })
-    } else {
-      cartItems.push({
-        id: props.product.id,
-        name: props.product.name,
-        price: props.product.price,
-        image: props.product.image,
-        quantity: 1
-      })
-      toast.add({
-        severity: 'success',
-        summary: 'Item adicionado',
-        detail: `${props.product.name} foi adicionado ao carrinho`,
-        life: 3000
-      })
+    const cartItem = {
+      id: props.product.id,
+      name: props.product.name + (size === 'large' ? ' (Grande)' : ' (Pequeno)'),
+      price: size === 'large' ? props.product.price_large : props.product.price_small,
+      quantity: 1,
+      image: props.product.image
     }
 
-    localStorage.setItem('burgerlivery:cart', JSON.stringify(cartItems))
+    const currentCart = localStorage.getItem('burgerlivery:cart')
+    let cart = currentCart ? JSON.parse(currentCart) : []
 
-    // Dispara evento para atualizar outros componentes
-    window.dispatchEvent(new Event('storage'))
+    const existingItem = cart.find((item: any) => 
+      item.id === cartItem.id && item.name === cartItem.name
+    )
+
+    if (existingItem) {
+      existingItem.quantity++
+    } else {
+      cart.push(cartItem)
+    }
+
+    localStorage.setItem('burgerlivery:cart', JSON.stringify(cart))
+
+    toast.add({
+      severity: 'success',
+      summary: 'Item adicionado',
+      detail: `${cartItem.name} foi adicionado ao carrinho`,
+      life: 3000
+    })
   } finally {
     loading.value = false
   }
@@ -116,7 +108,7 @@ const addToCart = async () => {
   background: var(--surface-0);
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   height: 100%;
   display: flex;
@@ -125,7 +117,7 @@ const addToCart = async () => {
 
 .product-card:hover {
   transform: translateY(-4px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
 .product-image {
@@ -199,7 +191,16 @@ const addToCart = async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: auto;
+  margin-top: 10px;
+  gap: 10px;
+  /* Adiciona espaço entre os botões */
+}
+
+.product-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* Adiciona espaço vertical entre os botões */
 }
 
 .product-price {

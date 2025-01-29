@@ -17,6 +17,13 @@
           <i :class="item.icon"></i>
           <span>{{ item.label }}</span>
         </router-link>
+
+        <div class="nav-menu-spacer"></div>
+        
+        <a @click="handleLogout" class="nav-item logout-item">
+          <i class="pi pi-sign-out"></i>
+          <span>Sair</span>
+        </a>
       </nav>
     </aside>
 
@@ -31,7 +38,6 @@
               @click="router.push('/cart')"
             >
               <i class="pi pi-shopping-cart"></i>
-              <span v-if="cartItemCount > 0" class="cart-badge">{{ cartItemCount }}</span>
             </Button>
 
             <div class="user-badge">
@@ -56,11 +62,28 @@
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import CartModal from '../components/CartModal.vue'
+import { useToast } from 'primevue/usetoast'
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 const cartItemCount = ref(3) // Mock data
 const showCart = ref(false)
+
+const handleLogout = () => {
+  localStorage.removeItem('burgerlivery:user')
+  localStorage.removeItem('burgerlivery:cart')
+  localStorage.removeItem('burgerlivery:token')
+  
+  toast.add({
+    severity: 'success',
+    summary: 'Logout realizado',
+    detail: 'Você foi desconectado com sucesso',
+    life: 3000
+  })
+  
+  router.push('/login')
+}
 
 const menuItems = [
   { label: 'Hambúrgueres', path: '/hamburgers', icon: 'fas fa-hamburger' },
@@ -112,6 +135,12 @@ const userInitial = computed(() => {
 .nav-menu {
   padding: 1rem;
   flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.nav-menu-spacer {
+  flex: 1;
 }
 
 .nav-item {
@@ -144,6 +173,20 @@ const userInitial = computed(() => {
 .nav-item span {
   margin-left: 0.75rem;
   font-weight: 500;
+}
+
+.logout-item {
+  margin-top: auto;
+  color: var(--red-600);
+  cursor: pointer;
+}
+
+.logout-item i {
+  color: var(--red-600) !important;
+}
+
+.logout-item:hover {
+  background-color: var(--red-50);
 }
 
 /* Main Content */
