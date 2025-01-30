@@ -3,7 +3,9 @@ Projeto feito para a Aula de FRONT-END ENGINEERING - Turma 94AOJ - Prof: Ubiraja
 
 ### Integrantes do grupo
 354909 - Gabriel Reis
+
 353733 - Tiago Cardoso
+
 353383 - Rodolfo Fulini
 
 ### Instalando o projeto
